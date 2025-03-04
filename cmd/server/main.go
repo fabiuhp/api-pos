@@ -1,13 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/fabiuhp/api-pos/configs"
-	"github.com/fabiuhp/api-pos/internal/dto"
 	"github.com/fabiuhp/api-pos/internal/entity"
 	"github.com/fabiuhp/api-pos/internal/infra/database"
+	"github.com/fabiuhp/api-pos/internal/infra/webserver/handlers"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -25,37 +24,10 @@ func main() {
 
 	db.AutoMigrate(&entity.Product{}, &entity.User{})
 
+	productDB := database.NewProduct(db)
+	productHandler := handlers.NewProductHandler(productDB)
+
+	http.HandleFunc("/products", productHandler.CreateProduct)
+
 	http.ListenAndServe(":8080", nil)
-}
-
-type ProductHandler struct {
-	ProductDB database.ProductInterface
-}
-
-func NewProductHandler(db *gorm.DB) *ProductHandler {
-	return &ProductHandler{
-		ProductDB: database.NewProduct(db),
-	}
-}
-
-func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
-	var product dto.CreateProductInput
-	err := json.NewDecoder(r.Body).Decode(&product)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	newProduct, err := entity.NewProduct(product.Name, product.Price)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	err = h.ProductDB.Create(newProduct)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusCreated)
 }
